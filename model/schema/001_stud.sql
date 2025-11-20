@@ -1,0 +1,11 @@
+-- +goose Up
+CREATE TABLE students(
+    id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    department VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- +goose Down
+DROP TABLE students;
