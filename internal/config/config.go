@@ -9,10 +9,12 @@ import (
 	"github.com/Cheemx/go-hrms/internal/database"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/joho/godotenv"
+	"github.com/robfig/cron/v3"
 )
 
 type APIConfig struct {
-	DB *database.Queries
+	DB        *database.Queries
+	Scheduler *cron.Cron
 }
 
 func Load() *APIConfig {
@@ -20,6 +22,8 @@ func Load() *APIConfig {
 	if err := godotenv.Load(); err != nil {
 		log.Fatal("Error: .env file not found!")
 	}
+
+	cron := cron.New()
 
 	// Initialize DB
 	dbURL := mustGetEnv("DB_URL")
@@ -34,7 +38,8 @@ func Load() *APIConfig {
 
 	dbQueries := database.New(db)
 	cfg := &APIConfig{
-		DB: dbQueries,
+		DB:        dbQueries,
+		Scheduler: cron,
 	}
 
 	fmt.Println("MySQL Database Connected Successfully.")

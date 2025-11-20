@@ -57,24 +57,108 @@ func (q *Queries) GetAttendanceByStudentID(ctx context.Context, studentID string
 	return items, nil
 }
 
-const getAttendanceSummary = `-- name: GetAttendanceSummary :one
+const getMonthlyAttendanceSummary = `-- name: GetMonthlyAttendanceSummary :many
 SELECT
-    SUM(CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) AS present_days,
+    a.student_id AS student_id,
+    s.name AS name,
+    s.email AS email,
+    CAST(SUM(CASE WHEN a.status = 'PRESENT' THEN 1 ELSE 0 END) AS UNSIGNED) AS present_days,
     COUNT(*) AS total_days
-FROM attendance
-WHERE student_id = ?
+FROM attendance a
+JOIN students s 
+ON s.id = a.student_id
+WHERE a.date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01')
+AND a.date <  DATE_FORMAT(CURDATE(), '%Y-%m-01')
+GROUP BY a.student_id, s.name, s.email
 `
 
-type GetAttendanceSummaryRow struct {
-	PresentDays interface{} `json:"present_days"`
-	TotalDays   int64       `json:"total_days"`
+type GetMonthlyAttendanceSummaryRow struct {
+	StudentID   string `json:"student_id"`
+	Name        string `json:"name"`
+	Email       string `json:"email"`
+	PresentDays int64  `json:"present_days"`
+	TotalDays   int64  `json:"total_days"`
 }
 
-func (q *Queries) GetAttendanceSummary(ctx context.Context, studentID string) (GetAttendanceSummaryRow, error) {
-	row := q.db.QueryRowContext(ctx, getAttendanceSummary, studentID)
-	var i GetAttendanceSummaryRow
-	err := row.Scan(&i.PresentDays, &i.TotalDays)
-	return i, err
+func (q *Queries) GetMonthlyAttendanceSummary(ctx context.Context) ([]GetMonthlyAttendanceSummaryRow, error) {
+	rows, err := q.db.QueryContext(ctx, getMonthlyAttendanceSummary)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetMonthlyAttendanceSummaryRow
+	for rows.Next() {
+		var i GetMonthlyAttendanceSummaryRow
+		if err := rows.Scan(
+			&i.StudentID,
+			&i.Name,
+			&i.Email,
+			&i.PresentDays,
+			&i.TotalDays,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getWeeklyAttendanceSummary = `-- name: GetWeeklyAttendanceSummary :many
+SELECT
+    a.student_id AS student_id,
+    s.name AS name,
+    s.email AS email,
+    CAST(SUM(CASE WHEN a.status = 'PRESENT' THEN 1 ELSE 0 END) AS UNSIGNED) AS present_days,
+    COUNT(*) AS total_days
+FROM attendance a
+JOIN students s 
+ON s.id = a.student_id
+WHERE a.date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+AND a.date <= CURDATE()
+GROUP BY a.student_id, s.name, s.email
+`
+
+type GetWeeklyAttendanceSummaryRow struct {
+	StudentID   string `json:"student_id"`
+	Name        string `json:"name"`
+	Email       string `json:"email"`
+	PresentDays int64  `json:"present_days"`
+	TotalDays   int64  `json:"total_days"`
+}
+
+func (q *Queries) GetWeeklyAttendanceSummary(ctx context.Context) ([]GetWeeklyAttendanceSummaryRow, error) {
+	rows, err := q.db.QueryContext(ctx, getWeeklyAttendanceSummary)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetWeeklyAttendanceSummaryRow
+	for rows.Next() {
+		var i GetWeeklyAttendanceSummaryRow
+		if err := rows.Scan(
+			&i.StudentID,
+			&i.Name,
+			&i.Email,
+			&i.PresentDays,
+			&i.TotalDays,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const markAttendance = `-- name: MarkAttendance :exec
